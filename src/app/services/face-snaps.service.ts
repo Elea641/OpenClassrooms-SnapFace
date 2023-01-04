@@ -1,4 +1,6 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { Observable, map, switchMap } from 'rxjs';
 import { FaceSnap } from '../models/face-snap';
 
 @Injectable({
@@ -6,75 +8,46 @@ import { FaceSnap } from '../models/face-snap';
 })
 export class FaceSnapsService {
 
-  faceSnaps: FaceSnap[] = [
-    {
-      id: 1,
-      title: 'Archibald',
-      description: 'Mon meilleur ami depuis tout petit !',
-      imageUrl: 'https://cdn.pixabay.com/photo/2015/05/31/16/03/teddy-bear-792273_1280.jpg',
-      createdDate: new Date(),
-      snaps: 0,
-      location: 'Paris'
-    },
-    {
-      id: 2,
-      title: 'Three Rock Mountain',
-      description: 'Un endroit magnifique pour les randonnées.',
-      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Three_Rock_Mountain_Southern_Tor.jpg/2880px-Three_Rock_Mountain_Southern_Tor.jpg',
-      createdDate: new Date(),
-      snaps: 0,
-      location: 'Tokyo'
-    },
-    {
-      id: 3,
-      title: 'Un bon repas',
-      description: 'Mmmh que c\'est bon !',
-      imageUrl: 'https://wtop.com/wp-content/uploads/2020/06/HEALTHYFRESH.jpg',
-      createdDate: new Date(),
-      snaps: 0
-    },
-    {
-      id: 4,
-      title: 'Doudou',
-      description: 'Tout tout doux',
-      imageUrl: 'https://media.licdn.com/dms/image/C4D03AQH1H3PC1rOW_A/profile-displayphoto-shrink_800_800/0/1620434605775?e=1678320000&v=beta&t=P4whu9A36khuAtu8XtXal0nBon9IXIpAb6ATv7Lf6kU',
-      createdDate: new Date(),
-      snaps: 0
-    },
-    {
-      id: 5,
-      title: 'Doudoudoudou',
-      description: 'Tout tout doudoux',
-      imageUrl: 'https://media.licdn.com/dms/image/C4D03AQH1H3PC1rOW_A/profile-displayphoto-shrink_800_800/0/1620434605775?e=1678320000&v=beta&t=P4whu9A36khuAtu8XtXal0nBon9IXIpAb6ATv7Lf6kU',
-      createdDate: new Date(),
-      snaps: 0
-    },
-    {
-      id: 6,
-      title: 'Doudidou',
-      description: 'Tout tout doudidoux',
-      imageUrl: 'https://media.licdn.com/dms/image/C4D03AQH1H3PC1rOW_A/profile-displayphoto-shrink_800_800/0/1620434605775?e=1678320000&v=beta&t=P4whu9A36khuAtu8XtXal0nBon9IXIpAb6ATv7Lf6kU',
-      createdDate: new Date(),
-      snaps: 0
-    }
-  ];
+  constructor(private http: HttpClient) {}
 
-  getAllFaceSnaps(): FaceSnap[] {
-    return this.faceSnaps;
+  faceSnaps: FaceSnap[] = [];
+
+  getAllFaceSnaps(): Observable<FaceSnap[]> {
+    return this.http.get<FaceSnap[]>('http://localhost:3000/facesnaps');
   }
 
-  getFaceSnapById(faceSnapId: number): FaceSnap {
-    const faceSnap = this.faceSnaps.find(faceSnap => faceSnap.id === faceSnapId);
-    if (!faceSnap) {
-        throw new Error('FaceSnap not found!');
-    } else {
-        return faceSnap;
-    }
+  getFaceSnapById(faceSnapId: number): Observable<FaceSnap> {
+    return this.http.get<FaceSnap>(`http://localhost:3000/facesnaps/${faceSnapId}`);
   }
 
-  snapFaceSnapById(faceSnapId: number, snapType: 'snap' | 'unsnap'): void {
-    const faceSnap = this.getFaceSnapById(faceSnapId);
-    snapType === 'snap' ? faceSnap.snaps++ : faceSnap.snaps--;
+  snapFaceSnapById(faceSnapId: number, snapType: 'snap' | 'unsnap'): Observable<FaceSnap> {
+    return this.getFaceSnapById(faceSnapId).pipe(
+        map(faceSnap => ({
+            ...faceSnap,
+            snaps: faceSnap.snaps + (snapType === 'snap' ? 1 : -1)
+        })),
+        switchMap(updatedFaceSnap => this.http.put<FaceSnap>(
+            `http://localhost:3000/facesnaps/${faceSnapId}`,
+            updatedFaceSnap)
+        )
+    );
+  }
+
+  addFaceSnap(formValue: { title: string, description: string, imageUrl: string, location?: string }): Observable<FaceSnap> {
+    return this.getAllFaceSnaps().pipe(
+         map(facesnaps => [...facesnaps].sort((a,b) => a.id - b.id)),
+         map(sortedFacesnaps => sortedFacesnaps[sortedFacesnaps.length - 1]),
+         map(previousFacesnap => ({
+            ...formValue,
+            snaps: 0,
+            createdDate: new Date(),
+            id: previousFacesnap.id + 1
+        })),
+        switchMap(newFacesnap => this.http.post<FaceSnap>(
+            'http://localhost:3000/facesnaps',
+            newFacesnap)
+        )
+    );
   }
 
 }
